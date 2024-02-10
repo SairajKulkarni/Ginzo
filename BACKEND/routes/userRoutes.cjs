@@ -32,6 +32,12 @@ router.get(
   userController.getAllUsers
 );
 
+router.post(
+  "/adminPanel",
+  authMiddleware.isAuthenticatedUser,
+  authMiddleware.authorizeRoles("admin")
+);
+
 // Uncomment and modify as needed
 // router
 //   .route("/admin/user/:id")
