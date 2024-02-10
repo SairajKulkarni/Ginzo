@@ -5,6 +5,9 @@ const cookieParser = require("cookie-parser");
 app.use(express.json());
 app.use(cookieParser());
 
+// Enable CORS for all routes
+app.use(cors());
+
 // Route imports
 const userRoute = require("./routes/userRoutes.cjs");
 const errorMiddleware = require("./middleware/error.cjs");
