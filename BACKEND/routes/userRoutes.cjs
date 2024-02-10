@@ -32,7 +32,11 @@ router.get(
   userController.getAllUsers
 );
 
-router.post("/adminPanel", authMiddleware.authorizeRoles("admin"));
+router.post(
+  "/adminPanel",
+  userController.loginUser,
+  authMiddleware.authorizeRoles("admin")
+);
 
 // Uncomment and modify as needed
 // router
