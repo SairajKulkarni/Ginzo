@@ -11,7 +11,7 @@ app.use(cors());
 
 // Route imports
 const userRoute = require("./routes/userRoutes.cjs");
-const imageRoute = require("./routes/ImageUploadRoutes.cjs");
+const imageRoute = require("./routes/imageUploadRoutes.cjs");
 const errorMiddleware = require("./middleware/error.cjs");
 
 app.use("/api/v1", userRoute);
