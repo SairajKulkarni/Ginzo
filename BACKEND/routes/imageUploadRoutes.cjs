@@ -8,9 +8,9 @@ const router = express.Router();
 router
   .route("/uploadImage")
   .post(
-    uploadMiddleware.singleUpload,
     authMiddleware.isAuthenticatedUser,
     authMiddleware.authorizeRoles("admin"),
+    uploadMiddleware.singleUpload,
     imageController.uploadImage
   );
 

@@ -2,6 +2,7 @@ const app = require("./app.cjs");
 const env = require("dotenv");
 const connectDatabase = require("./config/database.cjs");
 const cloudinary = require("cloudinary").v2;
+const cors = require("cors");
 
 // Handling Uncaught Exception (eg: console.log(youtube) )
 process.on("uncaughtException", (err) => {

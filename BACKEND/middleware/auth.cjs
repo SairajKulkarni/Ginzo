@@ -4,19 +4,38 @@ const jwt = require("jsonwebtoken");
 const User = require("../models/userModel.cjs");
 
 exports.isAuthenticatedUser = catchAsyncErrors(async (req, res, next) => {
-  const { token } = req.cookies;
+  let token;
+
+  // Check if the token is present in cookies
+  if (req.cookies && req.cookies.token) {
+    token = req.cookies.token;
+  } else if (
+    req.headers.authorization &&
+    req.headers.authorization.startsWith("Bearer")
+  ) {
+    // Check if the token is present in the Authorization header
+    token = req.headers.authorization.split(" ")[1];
+  }
 
   if (!token) {
     return next(new ErrorHandler("Please login to access this resource", 401));
   }
 
-  const decodeData = jwt.verify(token, process.env.JWT_SECRET);
+  try {
+    const decodeData = jwt.verify(token, process.env.JWT_SECRET);
 
-  req.user = await User.findById(decodeData.id);
+    req.user = await User.findById(decodeData.id);
 
-  next();
+    if (!req.user) {
+      return next(new ErrorHandler("User not found", 401));
+    }
+
+    next();
+  } catch (error) {
+    console.log(error);
+    return next(new ErrorHandler("Invalid token", 401));
+  }
 });
-
 // To ensure that admin is acessing
 exports.authorizeRoles = (...roles) => {
   return (req, res, next) => {

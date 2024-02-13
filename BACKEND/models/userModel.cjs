@@ -4,6 +4,7 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
 const catchAsyncErrors = require("../middleware/catchAsyncErrors.cjs");
+const otpGenerator = require("otp-generator");
 
 const userSchema = new mongoose.Schema({
   name: {
@@ -37,6 +38,18 @@ const userSchema = new mongoose.Schema({
     type: String,
     default: "user",
   },
+  videos: [
+    {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Video",
+    },
+  ],
+  payments: [
+    {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Payment",
+    },
+  ],
   resetPasswordToken: String,
   resetPasswordExpire: Date,
 });
@@ -61,19 +74,16 @@ userSchema.methods.comparePassword = async function (enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
 };
 
-// Generating password reset token
-userSchema.methods.getResetPasswordToken = async function () {
-  // Generating token
-  const resetToken = crypto.randomBytes(20).toString("hex");
+userSchema.methods.getResetPasswordToken = function () {
+  // Generating a 5-digit numeric OTP
+  const otp = Math.floor(10000 + Math.random() * 90000).toString();
 
-  // Hashing and add to userSchema
-  this.resetPasswordToken = crypto
-    .createHash("sha256")
-    .update(resetToken)
-    .digest("hex");
+  // Set OTP and expiry in the user schema
+  this.resetPasswordToken = otp;
+  this.resetPasswordExpire = Date.now() + 15 * 60 * 1000; // 15 minutes
 
-  this.resetPasswordExpire = Date.now() + 15 * 60 * 1000;
-  return resetToken;
+  // Return the OTP
+  return otp;
 };
 
 module.exports = mongoose.model("User", userSchema);

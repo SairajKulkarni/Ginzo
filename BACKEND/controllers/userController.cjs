@@ -1,9 +1,12 @@
 const User = require("../models/userModel.cjs");
+const Video = require("../models/videoModel.cjs");
 const ErrorHandler = require("../utils/errorHandler.cjs");
 const catchAsyncErrors = require("../middleware/catchAsyncErrors.cjs");
 const sendToken = require("../utils/jwtToken.cjs");
 const sendEmail = require("../utils/sendMail.cjs");
 const crypto = require("crypto");
+const cloudinary = require("cloudinary").v2;
+const uriParser = require("../utils/dataUri.cjs");
 
 // Register a user
 exports.registerUser = catchAsyncErrors(async (req, res, next) => {
@@ -68,16 +71,12 @@ exports.forgotPassword = catchAsyncErrors(async (req, res, next) => {
     return next(new ErrorHandler("User not found", 404));
   }
 
-  // Get resset password token
-  const resetToken = await user.getResetPasswordToken();
+  // Get reset password token (OTP)
+  const otp = await user.getResetPasswordToken();
 
   await user.save({ validateBeforeSave: false });
 
-  const resetPasswordUrl = `${req.protocol}://${req.get(
-    "host"
-  )}/api/v1/password/reset/${resetToken}`;
-
-  const message = `Your password token is :- \n\n ${resetPasswordUrl} \n\n If you have not requested this email then please ignore it`;
+  const message = `Your OTP for password reset is: ${otp}. Use this OTP to reset your password. If you have not requested this email then please ignore it.`;
 
   try {
     await sendEmail({
@@ -87,7 +86,7 @@ exports.forgotPassword = catchAsyncErrors(async (req, res, next) => {
     });
     res.status(200).json({
       success: true,
-      message: `Email sent to ${user.email} succcessfully`,
+      message: `Email sent to ${user.email} successfully`,
     });
   } catch (error) {
     user.resetPasswordToken = undefined;
@@ -101,34 +100,33 @@ exports.forgotPassword = catchAsyncErrors(async (req, res, next) => {
 
 // Reset Password
 exports.resetPassword = catchAsyncErrors(async (req, res, next) => {
-  // creating token
-  const resetPasswordToken = crypto
-    .createHash("sha256")
-    .update(req.params.token)
-    .digest("hex");
+  const { otp, password, confirmPassword } = req.body;
 
+  // Find the user with the provided OTP and a valid expiry time
   const user = await User.findOne({
-    resetPasswordToken,
+    resetPasswordToken: otp,
     resetPasswordExpire: { $gt: Date.now() },
   });
 
   if (!user) {
-    return next(
-      new ErrorHandler("Reset password token is invalid or expired", 400)
-    );
+    return next(new ErrorHandler("Invalid OTP or OTP expired", 400));
   }
 
-  if (req.body.password !== req.body.confirmPassword) {
+  if (password !== confirmPassword) {
     return next(new ErrorHandler("Passwords do not match", 400));
   }
 
-  user.password = req.body.password;
+  // Set the new password
+  user.password = password;
 
+  // Clear reset password fields
   user.resetPasswordToken = undefined;
   user.resetPasswordExpire = undefined;
 
+  // Save the user
   await user.save();
 
+  // Send token for user login or other actions
   sendToken(user, 200, res);
 });
 
@@ -244,5 +242,130 @@ exports.deleteUser = catchAsyncErrors(async (req, res, next) => {
   res.status(200).json({
     success: true,
     message: "User deleted successfully",
+  });
+});
+
+// Video Controllers
+exports.uploadVideo = catchAsyncErrors(async (req, res, next) => {
+  try {
+    console.log(req.body);
+    const { title, description } = req.body;
+    const file = req.file;
+    console.log(file);
+    if (!title || !description || !file) {
+      throw new ErrorHandler(
+        "Please provide both title, description, and video file.",
+        400
+      );
+    }
+
+    const fileUri = uriParser.getDataUri(file);
+    console.log("File URI:", fileUri); // Log the file URI
+
+    const myCloud = await cloudinary.uploader.upload(fileUri.content, {
+      resource_type: "video", // Specify the resource type as video
+    });
+    console.log("Cloudinary Upload Result:", myCloud); // Log Cloudinary upload result
+
+    const newVideo = await Video.create({
+      title,
+      description,
+      video: {
+        public_id: myCloud.public_id,
+        url: myCloud.secure_url,
+      },
+      tutor: req.user._id,
+    });
+
+    await User.findByIdAndUpdate(req.user._id, {
+      $push: { videos: newVideo._id },
+    });
+    console.log("New Video:", newVideo); // Log the new video entry
+
+    res.status(201).json({
+      success: true,
+      message: "Video uploaded successfully",
+      video: newVideo,
+    });
+  } catch (error) {
+    console.error("Error during video upload:", error);
+    next(new ErrorHandler(error.message, error.statusCode || 500));
+  }
+});
+
+// Get All Videos
+exports.getAllVideos = catchAsyncErrors(async (req, res, next) => {
+  const videos = await Video.find().populate("tutor", "name email"); // Populate tutor details
+  res.status(200).json({
+    success: true,
+    videos,
+  });
+});
+
+exports.getUserVideos = catchAsyncErrors(async (req, res, next) => {
+  const userId = req.user._id;
+
+  // Populate the 'videos' field to get details of each video
+  const userWithVideos = await User.findById(userId).populate("videos");
+
+  res.status(200).json({
+    success: true,
+    videos: userWithVideos.videos,
+  });
+});
+
+// Get Single Video Details
+exports.getVideoDetails = catchAsyncErrors(async (req, res, next) => {
+  const video = await Video.findById(req.params.id).populate(
+    "tutor",
+    "name email"
+  ); // Populate tutor details
+
+  if (!video) {
+    return next(
+      new ErrorHandler(`Video not found with id ${req.params.id}`, 404)
+    );
+  }
+
+  res.status(200).json({
+    success: true,
+    video,
+  });
+});
+
+// Update Video Details
+exports.updateVideoDetails = catchAsyncErrors(async (req, res, next) => {
+  const { title, description } = req.body;
+
+  const video = await Video.findByIdAndUpdate(
+    req.params.id,
+    { title, description },
+    {
+      new: true,
+      runValidators: true,
+      useFindAndModify: false,
+    }
+  );
+
+  res.status(200).json({
+    success: true,
+    message: "Video details updated successfully",
+    video,
+  });
+});
+
+// Delete Video
+exports.deleteVideo = catchAsyncErrors(async (req, res, next) => {
+  const video = await Video.findById(req.params.id);
+
+  if (!video) {
+    return next(new ErrorHandler(`Video not found with id: ${req.params.id}`));
+  }
+
+  await video.deleteOne();
+
+  res.status(200).json({
+    success: true,
+    message: "Video deleted successfully",
   });
 });

@@ -40,9 +40,13 @@ exports.uploadImage = catchAsyncErrors(async (req, res, next) => {
 // Get All Images
 exports.getAllImages = catchAsyncErrors(async (req, res, next) => {
   const images = await Image.find();
+
+  // Extract only the image URLs from the images array
+  const imageUrls = images.map((image) => image.image.url);
+
   res.status(200).json({
     success: true,
-    images,
+    images: imageUrls,
   });
 });
 

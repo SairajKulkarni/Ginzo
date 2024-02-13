@@ -2,11 +2,12 @@ const express = require("express");
 const userController = require("../controllers/userController.cjs");
 const authMiddleware = require("../middleware/auth.cjs");
 const router = express.Router();
+const uploadMiddleware = require("../middleware/multer.cjs");
 
 router.post("/register", userController.registerUser);
 router.post("/login", userController.loginUser);
 router.post("/password/forgot", userController.forgotPassword);
-router.put("/password/reset/:token", userController.resetPassword);
+router.put("/password/reset", userController.resetPassword);
 router.get("/logout", userController.logout);
 router.get(
   "/me",
@@ -32,10 +33,39 @@ router.get(
   userController.getAllUsers
 );
 
+router.post("/admin/login", userController.loginUser);
+
+router.post("/tutor/login", userController.loginUser);
+// Video Routes
 router.post(
-  "/adminPanel",
-  userController.loginUser,
-  authMiddleware.authorizeRoles("admin")
+  "/video/upload",
+  authMiddleware.isAuthenticatedUser,
+  authMiddleware.authorizeRoles("tutor"),
+  uploadMiddleware.singleUpload,
+  userController.uploadVideo
+);
+
+router.get(
+  "/user/videos",
+  authMiddleware.isAuthenticatedUser,
+  authMiddleware.authorizeRoles("tutor"),
+  userController.getUserVideos
+);
+
+router.get("/videos", userController.getAllVideos);
+
+router.get("/video/:id", userController.getVideoDetails);
+
+router.put(
+  "/video/update/:id",
+  authMiddleware.isAuthenticatedUser,
+  userController.updateVideoDetails
+);
+
+router.delete(
+  "/video/delete/:id",
+  authMiddleware.isAuthenticatedUser,
+  userController.deleteVideo
 );
 
 // Uncomment and modify as needed
