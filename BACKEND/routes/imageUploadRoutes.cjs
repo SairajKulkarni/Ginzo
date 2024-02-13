@@ -16,10 +16,6 @@ router
 
 router
   .route("/getAllImages")
-  .get(
-    authMiddleware.isAuthenticatedUser,
-    authMiddleware.authorizeRoles("admin"),
-    imageController.getAllImages
-  );
+  .get(authMiddleware.isAuthenticatedUser, imageController.getAllImages);
 
 module.exports = router;
