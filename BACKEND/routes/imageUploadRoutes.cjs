@@ -14,8 +14,6 @@ router
     imageController.uploadImage
   );
 
-router
-  .route("/getAllImages")
-  .get(authMiddleware.isAuthenticatedUser, imageController.getAllImages);
+router.route("/getAllImages").get(imageController.getAllImages);
 
 module.exports = router;
